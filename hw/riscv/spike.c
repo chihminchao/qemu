@@ -43,8 +43,6 @@
 #include "sysemu/qtest.h"
 #include "exec/address-spaces.h"
 
-#include <libfdt.h>
-
 static const struct MemmapEntry {
     hwaddr base;
     hwaddr size;
@@ -214,16 +212,12 @@ static void spike_board_init(MachineState *machine)
     rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
                           memmap[SPIKE_MROM].base, &address_space_memory);
 
-    /* copy in the device tree */
-    if (fdt_pack(s->fdt) || fdt_totalsize(s->fdt) >
-            memmap[SPIKE_MROM].size - sizeof(reset_vec)) {
-        error_report("not enough space to store device-tree");
+    if (riscv_load_fdt(s->fdt, memmap[SPIKE_MROM].base + sizeof(reset_vec),
+                   memmap[SPIKE_MROM].base + memmap[SPIKE_MROM].size,
+                   &address_space_memory) < 0) {
+        error_report("load device tree failed\n");
         exit(1);
     }
-    qemu_fdt_dumpdtb(s->fdt, fdt_totalsize(s->fdt));
-    rom_add_blob_fixed_as("mrom.fdt", s->fdt, fdt_totalsize(s->fdt),
-                          memmap[SPIKE_MROM].base + sizeof(reset_vec),
-                          &address_space_memory);
 
     /* initialize HTIF using symbols found in load_kernel */
     htif_mm_init(system_memory, mask_rom, &s->soc.harts[0].env, serial_hd(0));
@@ -303,16 +297,12 @@ static void spike_v1_10_0_board_init(MachineState *machine)
     rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
                           memmap[SPIKE_MROM].base, &address_space_memory);
 
-    /* copy in the device tree */
-    if (fdt_pack(s->fdt) || fdt_totalsize(s->fdt) >
-            memmap[SPIKE_MROM].size - sizeof(reset_vec)) {
-        error_report("not enough space to store device-tree");
+    if (riscv_load_fdt(s->fdt, memmap[SPIKE_MROM].base + sizeof(reset_vec),
+                   memmap[SPIKE_MROM].base + memmap[SPIKE_MROM].size,
+                   &address_space_memory) < 0) {
+        error_report("load device tree failed\n");
         exit(1);
     }
-    qemu_fdt_dumpdtb(s->fdt, fdt_totalsize(s->fdt));
-    rom_add_blob_fixed_as("mrom.fdt", s->fdt, fdt_totalsize(s->fdt),
-                          memmap[SPIKE_MROM].base + sizeof(reset_vec),
-                          &address_space_memory);
 
     /* initialize HTIF using symbols found in load_kernel */
     htif_mm_init(system_memory, mask_rom, &s->soc.harts[0].env, serial_hd(0));

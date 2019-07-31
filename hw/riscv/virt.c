@@ -42,8 +42,6 @@
 #include "hw/pci/pci.h"
 #include "hw/pci-host/gpex.h"
 
-#include <libfdt.h>
-
 #if defined(TARGET_RISCV32)
 # define BIOS_FILENAME "opensbi-riscv32-virt-fw_jump.bin"
 #else
@@ -447,16 +445,12 @@ static void riscv_virt_board_init(MachineState *machine)
     rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
                           memmap[VIRT_MROM].base, &address_space_memory);
 
-    /* copy in the device tree */
-    if (fdt_pack(s->fdt) || fdt_totalsize(s->fdt) >
-            memmap[VIRT_MROM].size - sizeof(reset_vec)) {
-        error_report("not enough space to store device-tree");
+    if (riscv_load_fdt(s->fdt, memmap[VIRT_MROM].base + sizeof(reset_vec),
+                       memmap[VIRT_MROM].base + memmap[VIRT_MROM].size,
+                       &address_space_memory) < 0) {
+        error_report("load device tree failed");
         exit(1);
     }
-    qemu_fdt_dumpdtb(s->fdt, fdt_totalsize(s->fdt));
-    rom_add_blob_fixed_as("mrom.fdt", s->fdt, fdt_totalsize(s->fdt),
-                          memmap[VIRT_MROM].base + sizeof(reset_vec),
-                          &address_space_memory);
 
     /* create PLIC hart topology configuration string */
     plic_hart_config_len = (strlen(VIRT_PLIC_HART_CONFIG) + 1) * smp_cpus;

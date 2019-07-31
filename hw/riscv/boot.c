@@ -17,8 +17,10 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <libfdt.h>
 #include "qemu/osdep.h"
 #include "qemu-common.h"
+#include "qemu/option.h"
 #include "qemu/units.h"
 #include "qemu/error-report.h"
 #include "exec/cpu-defs.h"
@@ -26,6 +28,7 @@
 #include "hw/riscv/boot.h"
 #include "hw/boards.h"
 #include "elf.h"
+#include "sysemu/device_tree.h"
 #include "sysemu/qtest.h"
 
 #if defined(TARGET_RISCV32)
@@ -160,4 +163,44 @@ hwaddr riscv_load_initrd(const char *filename, uint64_t mem_size,
     }
 
     return *start + size;
+}
+
+int riscv_load_fdt(void *fdt, hwaddr addr_base, hwaddr addr_limit,
+                    AddressSpace *as)
+{
+    const char* fdt_name = qemu_opt_get(qemu_get_machine_opts(), "dtb");
+    void *newfdt = NULL;
+    int size;
+
+    if (fdt_name) {
+        newfdt = load_device_tree(fdt_name, &size);
+        if (!newfdt) {
+            error_report("couldn't load dtb file %s", fdt_name);
+            return -1;
+        }
+
+        fdt = newfdt;
+    }
+
+    if (!fdt)
+        return -1;
+
+    if (fdt_pack(fdt)) {
+        error_report("invalid dtb file format");
+        return -1;
+    }
+
+    size = fdt_totalsize(fdt);
+    if (addr_limit >= addr_base && size + addr_base >= addr_limit) {
+        error_report("not enough space to store device-tree");
+        return -1;
+    }
+
+    qemu_fdt_dumpdtb(fdt, size);
+    rom_add_blob_fixed_as("mrom.fdt", fdt, size, addr_base, as);
+
+    if (newfdt)
+        g_free(newfdt);
+
+    return size;
 }

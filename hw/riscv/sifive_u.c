@@ -47,8 +47,6 @@
 #include "sysemu/device_tree.h"
 #include "exec/address-spaces.h"
 
-#include <libfdt.h>
-
 #define BIOS_FILENAME "opensbi-riscv64-sifive_u-fw_jump.bin"
 
 static const struct MemmapEntry {
@@ -302,16 +300,9 @@ static void riscv_sifive_u_init(MachineState *machine)
     rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
                           memmap[SIFIVE_U_MROM].base, &address_space_memory);
 
-    /* copy in the device tree */
-    if (fdt_pack(s->fdt) || fdt_totalsize(s->fdt) >
-            memmap[SIFIVE_U_MROM].size - sizeof(reset_vec)) {
-        error_report("not enough space to store device-tree");
-        exit(1);
-    }
-    qemu_fdt_dumpdtb(s->fdt, fdt_totalsize(s->fdt));
-    rom_add_blob_fixed_as("mrom.fdt", s->fdt, fdt_totalsize(s->fdt),
-                          memmap[SIFIVE_U_MROM].base + sizeof(reset_vec),
-                          &address_space_memory);
+    riscv_load_fdt(s->fdt, memmap[SIFIVE_U_MROM].base + sizeof(reset_vec),
+                   memmap[SIFIVE_U_MROM].base + memmap[SIFIVE_U_MROM].size,
+                   &address_space_memory);
 }
 
 static void riscv_sifive_u_soc_init(Object *obj)
